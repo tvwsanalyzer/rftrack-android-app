@@ -3,13 +3,15 @@
 
 package com.ictp.mrainone.rftrack.util;
 
-import java.lang.*;
+// import java.lang.*;
 
 import android.app.AlertDialog;
 import android.app.Service;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.location.GpsStatus;
+import android.location.GpsStatus.Listener;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -43,8 +45,10 @@ public class GPSTracker extends Service implements LocationListener {
 	// flag for GPS status
 	boolean canGetLocation = false;
 
-	Location location; // location
-    String GpsStatus;
+	Location location; 		// location
+	// boolean fFixGps = true;	// true if gps has location fixed
+	boolean fFixGps = false;	// true if gps has location fixed
+    String StrGpsStatus;
 
 	// old latitude and longitude position
 	boolean fPosIsChanged;	// true if (latitude, longitude) is changed
@@ -77,6 +81,58 @@ public class GPSTracker extends Service implements LocationListener {
 	// Declaring a Location Manager
 	protected LocationManager locationManager;
 
+
+	// http://stackoverflow.com/questions/15453576/android-check-if-gps-is-searching-has-fix-or-is-not-in-use
+	// see:
+	// http://developer.android.com/reference/android/location/GpsStatus.html
+	public Listener mGPSStatusListener = new GpsStatus.Listener()
+	{    
+		public void onGpsStatusChanged(int event) 
+		{   
+			// 4 events managed:
+			// GPS_EVENT_FIRST_FIX: Event sent when the GPS system has received its first fix since starting.
+			// GPS_EVENT_SATELLITE_STATUS: Event sent periodically to report GPS satellite status.
+			// GPS_EVENT_STARTED: Event sent when the GPS system has started.
+			// GPS_EVENT_STOPPED: Event sent when the GPS system has stopped.
+			switch(event) 
+			{
+			case GpsStatus.GPS_EVENT_STARTED:
+				// Event sent when the GPS system has started.
+				StrGpsStatus = "GPS Searching";
+				break;
+			case GpsStatus.GPS_EVENT_STOPPED:
+				// Event sent when the GPS system has stopped.
+				fFixGps = false;	// true if gps has location fixed
+				StrGpsStatus = "GPS Stopped";
+				break;
+			case GpsStatus.GPS_EVENT_FIRST_FIX:
+				// Event sent when the GPS system has received its first fix since starting.
+				// GPS_EVENT_FIRST_FIX Event is called when GPS is locked            
+				fFixGps = true;	// true if gps has location fixed
+				StrGpsStatus = "GPS Fix";
+				Location gpslocation = locationManager
+							.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+
+				if(gpslocation != null)
+				{       
+					// StrGpsStatus = "GPS Info";
+					// StrGpsStatus = "GPS Info:"+gpslocation.getLatitude()+":"+gpslocation.getLongitude());
+
+					/*
+						* Removing the GPS status listener once GPS is locked  
+						*/
+					locationManager.removeGpsStatusListener(mGPSStatusListener);                
+				}               
+
+				break;
+			case GpsStatus.GPS_EVENT_SATELLITE_STATUS:
+				// Event sent periodically to report GPS satellite status.
+				StrGpsStatus = "GPS_EVENT_SATELLITE_STATUS";
+				break;                  
+			}
+		}
+	};	
+	
 	public GPSTracker(Context context, DatabaseHelper dbHelper, long start_campaign_id) {
 		this.mContext = context;
 		
@@ -303,6 +359,8 @@ public class GPSTracker extends Service implements LocationListener {
 			
 			boolean fPosChanged = false; 	// true if the position is changed
 			
+			// fFixGps = true;					// true has fix gps
+			
 			locationManager = (LocationManager) mContext
 					.getSystemService(LOCATION_SERVICE);
 
@@ -316,6 +374,7 @@ public class GPSTracker extends Service implements LocationListener {
 
 			if (!isGPSEnabled && !isNetworkEnabled) {
 				// no network provider is enabled
+				// fFixGps = false;					// false no fix gps
 				fPosChanged = clearLocationData();
 			} 
 			else {
@@ -329,11 +388,24 @@ public class GPSTracker extends Service implements LocationListener {
 							MIN_DISTANCE_CHANGE_FOR_UPDATES, this);
 					Log.d("GPS Enabled", "GPS Enabled");
 					if (locationManager != null) {
+						//---------------------------------
+						// http://stackoverflow.com/questions/15453576/android-check-if-gps-is-searching-has-fix-or-is-not-in-use
+						// Register GPSStatus listener for events
+						// Each time if you call GPS function, GPSStatus listener is registered
+						locationManager.addGpsStatusListener(mGPSStatusListener); 
+						//---------------------------------
+						
 						location = locationManager
 								.getLastKnownLocation(LocationManager.GPS_PROVIDER);
 						
 						fPosChanged = readLocationData();
 					}
+					/***
+					else
+					{
+						fFixGps = false;					// false no fix gps
+					}
+					***/
 				}
 				if (isNetworkEnabled) {
 					// network enabled
@@ -346,11 +418,24 @@ public class GPSTracker extends Service implements LocationListener {
 								MIN_DISTANCE_CHANGE_FOR_UPDATES, this);
 						Log.d("Network", "Network");
 						if (locationManager != null) {
+							//---------------------------------
+							// http://stackoverflow.com/questions/15453576/android-check-if-gps-is-searching-has-fix-or-is-not-in-use
+							// Register GPSStatus listener for events
+							// Each time if you call GPS function, GPSStatus listener is registered
+							locationManager.addGpsStatusListener(mGPSStatusListener); 
+							//---------------------------------
+
 							location = locationManager
 									.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
 							
 							fPosChanged = readLocationData();
 						}
+						/***
+						else
+						{
+							fFixGps = false;					// false no fix gps
+						}
+						***/
 					}
 				}
 			}
@@ -371,6 +456,7 @@ public class GPSTracker extends Service implements LocationListener {
 		return location;
 	}
 	
+	
 	/**
 	 * Stop using GPS listener
 	 * Calling this function will stop using GPS in your app
@@ -381,6 +467,13 @@ public class GPSTracker extends Service implements LocationListener {
 		}		
 	}
 
+	/**
+	 * Function to get flag fix gps
+	 * */
+	public boolean getFixGps(){
+		return fFixGps;
+	}
+	
 	/**
 	 * Function to get Latitude
 	 * */

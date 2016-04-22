@@ -125,6 +125,65 @@ public class RFEdata
 		return(result);
 	}
 
+	// per la gestione del grafico: 
+	// crea un vettore di float contenente i dBm, senza la parte decimale.
+	// Per il tipo di applicazione, questa non e' significativa
+	public float[]CopydBmToFloatArray()
+	{
+		int value;
+		float[] float_array = new float[len];
+		
+		for(int i=0;i<len;i++)
+		{
+			value = -((int)msg[i] & 0xFF);
+			value = (value / 2);
+			// load the float_array
+			float_array[i] = (float)value;
+		}
+		return(float_array);
+	}
+
+	// versione che copia i dati nell'array definito in float_array
+	public void CopydBmToFloatArray(float[] float_array)
+	{
+		int value;
+		
+		for(int i=0;i<len;i++)
+		{
+			value = -((int)msg[i] & 0xFF);
+			value = (value / 2);
+			// load the float_array
+			float_array[i] = (float)value;
+		}
+		return;
+	}
+
+	// per verifica occupazione white spaces: 
+	// Restituisce la percentuale di campioni dBm che risultano sotto la soglia impostata
+	// Per il tipo di applicazione, questa non e' significativa
+	public float PercdBmBelowThreshold(float threshold)
+	{
+		int count;
+		int value;
+		float data;
+		
+		count = 0;
+		for(int i=0;i<len;i++)
+		{
+			value = -((int)msg[i] & 0xFF);
+			value = (value / 2);
+			data = (float)value;
+			if(data<=threshold)
+				count++;
+		}
+		// calc percentuage
+		data = (float)count;
+		data = data * 100.0f;
+		data = data / ((float)len);
+		return(data);
+	}
+
+	
 	// restituisce il riferimento al messaggio
 	public byte[]Msg()
 	{

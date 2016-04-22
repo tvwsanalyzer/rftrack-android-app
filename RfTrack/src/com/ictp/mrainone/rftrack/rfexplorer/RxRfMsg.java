@@ -49,6 +49,11 @@ public class RxRfMsg
 	
 	// n. di messaggi ricevuti in funzione dei parametri inviati
 	static long nMsgRead = 0;
+
+	//-----------------------------------
+	// 12/04: per la gestione del grafico sulla pag. principale
+	public float[] GraphdBm = null;
+	//-----------------------------------
 	
 	private static long tmSendMessage;		// tempo di inizio invio messaggio in msec
 	
@@ -73,6 +78,10 @@ public class RxRfMsg
 	public byte[] msgRx = new byte[MaxLenMsg];
 
 
+	//--------------------------------------
+	// percentuale campioni sotto il threshold
+	static float PercBelowThreshold;
+	
 	//--------------------------------------
 	// max values
 	static float MaxdBmFreq;		// Value of the frequency corresponding to the maximum value of the signal
@@ -122,6 +131,9 @@ public class RxRfMsg
 		}
 		//------------------------
 		this.clean();
+		//------------------------
+		GraphdBm = null;
+		//------------------------
 	}
 
 	public void setdbHelper(DatabaseHelper dbHelper)
@@ -160,6 +172,9 @@ public class RxRfMsg
 		// inizializza il numero di messaggi ottenuti come risposta
 		nMsgRead = 0;
 
+		// initialize la percentuale below threshold
+		PercBelowThreshold=0.0f;
+		
 		// initialize the values of max dBm
 		MaxdBm = -255.0f;
 		MaxdBmFreq = 0.0f;
@@ -286,6 +301,18 @@ public class RxRfMsg
 	
 	public float getMaxdBmFreq() {
 		return MaxdBmFreq;
+	}
+	
+	public long getNMsgRead() {
+		return nMsgRead;
+	}
+
+	public float[] getGraphDbm() {
+		return GraphdBm;
+	}
+	
+	public float getPercBelowThreshold() {
+		return PercBelowThreshold;
 	}
 	
 	//----------------------------------------------------------------------------
@@ -421,6 +448,24 @@ public class RxRfMsg
 					RxFifo.add(msg);
 					nMsgRead++; 		// incrementa il n. di messaggi letti
 
+					//------------------------------------
+					// modify 12/04: 
+					// il messaggio e' stato ricevuto completamente,
+					// aggiorna il vettore di dati per il grafico
+					{
+						if(GraphdBm == null)
+						{
+							GraphdBm = msg.CopydBmToFloatArray();
+						}
+						else
+						{
+							msg.CopydBmToFloatArray(GraphdBm);
+						}
+					}
+					//------------------------------------
+					// carica la perc. di campioni below threshold 100dBm
+					PercBelowThreshold = msg.PercdBmBelowThreshold(-100.0f);
+					
 					boolean fUpdate = updateMaxdBm(msg);	// aggiorna il valore max dbm
 					
 					//---------------------------------
@@ -524,7 +569,6 @@ public class RxRfMsg
 		{
 			DecodeRFEAcquisition(data);		// decodifica il messaggio
 		}
-		//------------------------------------
 		return(RxAll);
 	}
 

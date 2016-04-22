@@ -542,7 +542,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			int Amp_Bottom,
 			int nSteps) {
 				
-		String KeyName;
+		// String KeyName;
 
 		SQLiteDatabase db = this.getWritableDatabase();
 

@@ -63,16 +63,13 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
-import android.content.res.Resources;
 // android.graphics: Provides low level graphics tools such as canvases, color filters, points, and rectangles that let you handle drawing to the screen directly. 
 import android.graphics.Color;
 
 // android.view: Provides classes that expose basic user interface classes that handle screen layout and interaction with the user.
 import android.view.LayoutInflater;		// LayoutInflater: Instantiates a layout XML file into its corresponding View objects.
 import android.view.View;				// View: This class represents the basic building block for user interface components.
-import android.view.View.MeasureSpec;
 import android.view.View.OnClickListener;
-import android.view.Display;
 import android.view.Gravity;
 
 // for menus:
@@ -87,7 +84,6 @@ import android.widget.ArrayAdapter;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ScrollView;
 import android.widget.LinearLayout;
-import android.widget.ListAdapter;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -102,7 +98,7 @@ import android.view.WindowManager;
 
 // android.hardware.usb: Provides support to communicate with USB hardware peripherals that are connected to Android-powered devices.
 // import android.hardware.usb.UsbDevice;
-import android.hardware.usb.UsbManager;
+// import android.hardware.usb.UsbManager;
 
 // android.media: provides classes that manage various media interfaces in audio and video. 
 // used for the generation of a tone. See the example:
@@ -115,14 +111,11 @@ import android.media.ToneGenerator;
 // import android.location.LocationListener;
 // import android.location.LocationManager;
 // import android.location.LocationProvider;
-import android.util.DisplayMetrics;
+
 // android.util: Provides common utility methods such as date/time manipulation, base64 encoders and decoders, string and number conversion methods, and XML utilities.
 import android.util.Log;				// for debug logging
-// import android.util.TypedValue;
 
-// See project home page: http://code.google.com/p/usb-serial-for-android/
-import com.hoho.android.usbserial.driver.UsbSerialDriver;
-import com.hoho.android.usbserial.driver.UsbSerialProber;
+// import com.hoho.android.usbserial.driver.UsbSerialProber;
 import com.hoho.android.usbserial.util.SerialInputOutputManager;
 import com.ictp.mrainone.rftrack.R;
 import com.ictp.mrainone.rftrack.helper.DatabaseHelper;
@@ -134,7 +127,7 @@ import com.ictp.mrainone.rftrack.rfexplorer.RxRfMsg;
 import com.ictp.mrainone.rftrack.rfexplorer.RFEdata;
 import com.ictp.mrainone.rftrack.rfexplorer.RFEdataFifo;
 import com.ictp.mrainone.rftrack.rfexplorer.RFEConfiguration;
-import com.ictp.mrainone.rftrack.rfexplorer.GraphView;
+import com.ictp.mrainone.rftrack.rfexplorer.RFEComPort;
 import com.ictp.mrainone.rftrack.util.GPSTracker;
 import com.ictp.mrainone.rftrack.util.sdmemory;
 import com.ictp.mrainone.rftrack.util.HwInfo;
@@ -158,7 +151,7 @@ public class RfTrackActivity extends Activity
 	//---------------------------------------
 	// stringa contenente la versione
 	final String ProgramName = "RfTrack Logger";
-	final String ProgramVersion = "0.80 Beta - April 14th, 2016";
+	final String ProgramVersion = "0.58 Beta - September 12th, 2015";
 
 	//---------------------------------------
 	// menu item
@@ -268,25 +261,9 @@ public class RfTrackActivity extends Activity
 	// ====================================
 	// Gestione della seriale
 	// ====================================
-
-    // android.hardware.usb.UsbManager:
-    // This class allows you to access the state of USB and communicate with USB devices.
-    // Currently only host mode is supported in the public API.
-    // The system's USB service.
-    private UsbManager mUsbManager;
-
-	private void getUsbManager()
-	{
-		// Get mUsbManager from Android.
-        mUsbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
-	}
+	private RFEComPort RFEcom;
 	
-    /**
-     * The device currently in use, or {@code null}.
-     */
-    private UsbSerialDriver mSerialDevice;
-
-	//---------------------------------------
+    //---------------------------------------
 	// serial parameters 
 	//---------------------------------------
 	// the RF Explorer RF spectrum analyzer uses 2 baudrates: 500000 (default) and 2400.
@@ -326,7 +303,6 @@ public class RfTrackActivity extends Activity
 
 	// Configuration of the floating point format in the .csv file
 	// DecimalFormat: subclass of NumberFormat that formats decimal numbers.
-	DecimalFormat FormatterNumber;	// value formatter for generic number
 	DecimalFormat FormatterFreq;	// value formatter for frequency
 	DecimalFormat FormatterDBval;	// value formatter for DB
 	DecimalFormat FormatterDBmax;	// value formatter for max DB
@@ -447,20 +423,6 @@ public class RfTrackActivity extends Activity
 			}
 			***/
 			// modifica 04/08
-			ShowInfoNMeasurements(); 	// update n. measurements
-			// ShowInfoFixPosition();
-			ShowInfoGps();
-			// aggiorna la percentuale campioni inferiori a -100dBm
-			ShowInfoPercThreshold();
-			
-			//---------------------------------------
-			// modifica 12/04
-			// aggiorna il grafico con i dati del messaggio ricevuto
-			graphView.updateValues(RxMsg.getGraphDbm());
-			//---------------------------------------
-			
-			/****
-			// disabilitato il 14/04
 			if(RxMsg.MaxdBmIsChanged())
 			{
 				MaxDB = RxMsg.getMaxdBm();
@@ -469,34 +431,36 @@ public class RfTrackActivity extends Activity
 				
 				RxMsg.resetChangeMaxdBm();		// reset flag change max dBm
 			
-	            //---  // per debug
-	            //---  // String[] mrRow = {"33121.98311", "33181.49911", "4412.43311", "113211.43823", "2222.43233", "110.29999"};
-	            //---  String[] mrRow = new String[6];
-				//---  double[] coord;
-				//---  DecimalFormat df = new DecimalFormat("* ########0.000000");
-				//---  // get the actual position
-				//---  coord = gps.getLastLocationCoordinates();
-				//---  
-				//---  // Time: 
-				//---  SimpleDateFormat dateFormat = new SimpleDateFormat(
-				//---  		"HH:mm:ss.SSS", Locale.getDefault());
-				//---  Date date = new Date();
-				//---  mrRow[0] = dateFormat.format(date);
-				//---  // Latitude: 
-				//---  mrRow[1] = df.format(coord[0]);
-				//---  // Longitude:
-				//---  mrRow[2] = df.format(coord[1]);
-				//---  // Altitude: 
-				//---  mrRow[3] = df.format(coord[2]);
-				//---  // Freq (MHz): 
-				//---  mrRow[4] = FormatterFreq.format(MaxDBFreq);
-				//---  // Max dBm:
-				//---  mrRow[5] = FormatterDBval.format(MaxDB);
-				//---  
-				//---  mTable.addRow(mrRow);
-			}
-			***/
+				/**
+	            // per debug
+	            // String[] mrRow = {"33121.98311", "33181.49911", "4412.43311", "113211.43823", "2222.43233", "110.29999"};
+	            String[] mrRow = new String[6];
+				double[] coord;
+				DecimalFormat df = new DecimalFormat("* ########0.000000");
+				// get the actual position
+				coord = gps.getLastLocationCoordinates();
+				
+				// Time: 
+				SimpleDateFormat dateFormat = new SimpleDateFormat(
+						"HH:mm:ss.SSS", Locale.getDefault());
+				Date date = new Date();
+				mrRow[0] = dateFormat.format(date);
+				// Latitude: 
+				mrRow[1] = df.format(coord[0]);
+				// Longitude:
+				mrRow[2] = df.format(coord[1]);
+				// Altitude: 
+				mrRow[3] = df.format(coord[2]);
+				// Freq (MHz): 
+				mrRow[4] = FormatterFreq.format(MaxDBFreq);
+				// Max dBm:
+				mrRow[5] = FormatterDBval.format(MaxDB);
+				
+				mTable.addRow(mrRow);
+				**/
 			
+			}
+
 			RxFifo.peek();
 
 		}
@@ -515,19 +479,7 @@ public class RfTrackActivity extends Activity
 		return true;
     }
 
-    private boolean startRxSerialManager()
-    {
-        if (isSerialAcquired()==false)
-        {
-			return false;
-		}
-		
-		// la porta seriale e' disponibile
-		Log.i(TAG, "Starting rx serial io manager ..");
-		rxSerialIoManager = new SerialInputOutputManager(mSerialDevice, mListener);
-		mExecutor.submit(rxSerialIoManager);
-        return true;
-    }
+    
 	
 	/**************
 	// @@@ la funzione updateReceivedData e' stata suddivisa in due parti
@@ -564,127 +516,33 @@ public class RfTrackActivity extends Activity
 		return result;
 	}
 	****/
-
-	// visualizza il n. di misure
-	private void ShowInfoNMeasurements()
-	{
-		String data = "";
-		// measurement number
-		data = FormatterNumber.format((double)RxMsg.getNMsgRead());
-		mTable.SetText(1, 0, data);
-	}
-
-	private void ShowInfoFixPosition()
-	{
-		// double[] coord;
-		String data = "";
-		// measurement number
-		if(gps.getFixGps())
-		{
-			data = "Pos. Fixed";
-		}
-		else
-		{
-			data = "--------";
-		}
-		mTable.SetText(1, 1, data);
-	}
-	
-	private void ShowInfoGps()
-	{
-		double[] coord;
-		DecimalFormat df = new DecimalFormat("* ###0.00000");
-		String data = "";
-		
-		// get the actual position
-		coord = gps.getLastLocationCoordinates();
-		// check if gps is fixed
-		if(gps.getFixGps())
-		{
-			data = "Pos. Fixed";
-		}
-		else
-		{
-			data = "--------";
-		}
-		// update fix
-		mTable.SetText(1, 1, data);
-		
-		// Latitude: 
-		data = df.format(coord[0]);
-		mTable.SetText(1, 2, data);
-		// Longitude:
-		data = df.format(coord[1]);
-		mTable.SetText(1, 3, data);
-		// Altitude: 
-		data = df.format(coord[2]);
-		mTable.SetText(1, 4, data);
-	}
-
-	private void ShowInfoPercThreshold()
-	{
-		DecimalFormat df = new DecimalFormat("* ###0");
-		String data = "";
-		
-		// Percentuage samples < 100dBm: 
-		data = df.format(RxMsg.getPercBelowThreshold());
-		mTable.SetText(1, 5, data);
-	}
 	
 	// visualizza i dBm e la posizione
 	private void ShowInfoPosMaxdBm()
 	{
-		String[] rowCol = new String[8];
+		String[] rowCol = new String[6];
 		double[] coord;
-		// original: DecimalFormat df = new DecimalFormat("* ########0.000000");
-		
-		// modify 06/04
-		DecimalFormat df = new DecimalFormat("* ###0.00000");
-		DecimalFormat dfFreq = new DecimalFormat("* ##0.000");
-		DecimalFormat dfDb = new DecimalFormat("* ##0.0");
-		
+		DecimalFormat df = new DecimalFormat("* ########0.000000");
 		// get the actual position
 		coord = gps.getLastLocationCoordinates();
 		
 		// Time: 
-		/***
-		original with milliseconds
 		SimpleDateFormat dateFormat = new SimpleDateFormat(
 				"HH:mm:ss.SSS", Locale.getDefault());
-		****/
-		SimpleDateFormat dateFormat = new SimpleDateFormat(
-				"HH:mm:ss", Locale.getDefault());
 		Date date = new Date();
-
-		// measurement number
-		rowCol[0] = FormatterNumber.format((double)RxMsg.getNMsgRead());
-		
-		// gps fix
-		if(gps.getFixGps() == true)
-		{
-			rowCol[1] = "Fixed !!";
-		}
-		else
-		{
-			rowCol[1] = "--------";
-		}
+		rowCol[0] = dateFormat.format(date);
 		// Latitude: 
-		rowCol[2] = df.format(coord[0]);
+		rowCol[1] = df.format(coord[0]);
 		// Longitude:
-		rowCol[3] = df.format(coord[1]);
+		rowCol[2] = df.format(coord[1]);
 		// Altitude: 
-		rowCol[4] = df.format(coord[2]);
-		// Max dBm:
-		rowCol[5] = dfDb.format(MaxDB);
+		rowCol[3] = df.format(coord[2]);
 		// Freq (MHz): 
-		rowCol[6] = dfFreq.format(MaxDBFreq);
-
-		rowCol[7] = dateFormat.format(date);		// time
+		rowCol[4] = FormatterFreq.format(MaxDBFreq);
+		// Max dBm:
+		rowCol[5] = FormatterDBval.format(MaxDB);
 		
-		// original
-		// mTable.addRow(rowCol);
-		// modify 06/04:
-		mTable.SetTextColumn(1, rowCol);
+		mTable.addRow(rowCol);
 		
 		// update the screen
 		// mDumpTextView.append(message);
@@ -719,127 +577,6 @@ public class RfTrackActivity extends Activity
 	}
 	****/
 
-	// restituisce true se la seriale e' acquisita
-	private boolean isSerialAcquired()
-	{
-		boolean fAcquired = false;
-
-        if (mSerialDevice != null)
-        {
-			fAcquired = true;
-		}
-		return fAcquired;
-	}
-	
-	private boolean OpenSerial()
-	{
-		boolean done = true;
-		
-        if (isSerialAcquired() == false)
-        {
-			return false;
-		}
-		
-		try
-		{
-			mSerialDevice.open();
-		}
-		catch (IOException e)
-		{
-			Log.e(TAG, "Error OpenSerial: " + e.getMessage(), e);
-			done = false;
-			// Ignore.
-		}
-		return done;
-	}
-	
-	private boolean CloseSerial()
-	{
-		boolean done = true;
-		
-        if (isSerialAcquired() == false)
-        {
-			return false;
-		}
-		
-		try
-		{
-			mSerialDevice.close();
-		}
-		catch (IOException e)
-		{
-			Log.e(TAG, "Error CloseSerial: " + e.getMessage(), e);
-			done = false;
-			// Ignore.
-		}
-		//----------------------------
-		// 23/08: disabled
-		// mSerialDevice = null;
-		//----------------------------
-		
-		return done;
-	}
-
-	private boolean SetBaudSerial(int baud)
-	{
-		boolean done = true;
-		
-        if (isSerialAcquired() == false)
-        {
-			return false;
-		}
-		
-		try
-		{
-			mSerialDevice.setParameters(baud, 8, 1, 0);
-		}
-		catch (IOException e)
-		{
-			Log.e(TAG, "Error SetBaudSerial: " + e.getMessage(), e);
-			done = false;
-			// Ignore.
-		}
-		return done;
-	}
-
-	private boolean SendCfgMessage(int timeoutMillis)
-	{
-		boolean done = true;
-
-        if (isSerialAcquired() == false)
-        {
-			return false;
-		}
-		
-		try
-		{
-			//---------------------
-			// mr: invio del messaggio
-			// String msg = "# C2-F:0400000,0500000,-050,-120";
-
-			// vettore di byte contenente il messaggio di configurazione
-			byte[] msgSendCfg = 
-				RxMsg.MsgConfigurationData(
-					RFEfreq.GetStart(),		// KHZ, Value of frequency span start (lower)
-					RFEfreq.GetEnd(),		// KHZ, Value of frequency span end (higher)
-					RfCfg.Amp_Top,			// dBm, Highest value of amplitude for GUI
-					RfCfg.Amp_Bottom );		// dBm, Lowest value of amplitude for GUI
-			mSerialDevice.write(msgSendCfg, timeoutMillis);					// send the message
-
-			// Convert the string message to display it
-			String msg = new String(msgSendCfg);			// conversione corretta byte[] to String
-			// aggiorna il log
-			Log.i("mr", "Msg protocollo:>" + msg);
-			
-		}
-		catch (IOException e)
-		{
-			Log.e(TAG, "Error SendCfgMessage: " + e.getMessage(), e);
-			done = false;
-			// Ignore.
-		}
-		return done;
-	}
 	
 	// ====================================
 	// fine Gestione della seriale
@@ -986,7 +723,6 @@ public class RfTrackActivity extends Activity
 			
 			//-------------------------------
 			// http://www.coderanch.com/t/385190/java/java/Setting-decimalFormatSymbols
-			FormatterNumber = new DecimalFormat("* ##0", CsvDecimalFormatSym);
 			FormatterFreq = new DecimalFormat("* ##0.000", CsvDecimalFormatSym);
 			FormatterDBval = new DecimalFormat("* #####0.0", CsvDecimalFormatSym);
 			FormatterDBmax = new DecimalFormat("* #####0.0", CsvDecimalFormatSym);
@@ -1335,72 +1071,6 @@ public class RfTrackActivity extends Activity
 // dialogs created programmatically
 //============================================================
 
-// dialogo per segnalare abilitazione ridotta funzioni
-// L'app viene lanciata automaticamente se viene connesso il cavo otg collegato allo strumento.
-// E' inutile fare tentativi di riconnessione, quindi si segnala che sono disabilitate 
-// le funzioni start new campaign ed open campaign
-//
-void dialogInfoRFENotCommected(String title)
-{
-	Log.i(TAG, "show dialogInfoRFENotCommected");
-	
-	AlertDialog.Builder builder = 
-	new AlertDialog.Builder(global_context);
-
-	// builder.setTitle("Start Serial Communication");
-	builder.setTitle(title);
-	builder.setIcon(R.drawable.ictp_logo);
-	
-	builder.setMessage(
-		"The app runs without connection to RFExplorer.\n" +
-		"The following functions are disabled:\n" +
-		"   1) Start New Campaign\n" +
-		"   2) Open Campaign\n" +
-		"To collect campaign data, exit and attach to the USB port\n" +
-		"an OTG cable connected to the RFExplorer.");
-	
-	builder.setCancelable(false);
-	builder.setPositiveButton("OK", 
-		new DialogInterface.OnClickListener() {
-			public void onClick(DialogInterface dialog, int which) 
-			{
-				mSerialDevice = UsbSerialProber.acquire(mUsbManager);
-				Log.d(TAG, "mSerialDevice=" + mSerialDevice);
-				if (isSerialAcquired() == false)
-				{
-					// serial was not acquired
-					// mTitleTextView.setText("No serial device acquired.");
-					// return;
-					Toast.makeText(
-							global_context, 
-							"RFExplorer not connected!", 
-							Toast.LENGTH_SHORT
-							)
-							.show();
-				}
-				else
-				{
-					// serial was not acquired
-					// mTitleTextView.setText("No serial device acquired.");
-					// return;
-					Toast.makeText(
-							global_context, 
-							"Connected!", 
-							Toast.LENGTH_SHORT
-							)
-							.show();
-				}
-				
-				dialog.cancel();
-			}
-		}
-	);
-	AlertDialog alert = builder.create();
-	alert.show();
-}
-
-
-
 // dialogo per inizio connessione seriale
 void dialogSerialStartConnect(String title)
 {
@@ -1411,7 +1081,6 @@ void dialogSerialStartConnect(String title)
 
 	// builder.setTitle("Start Serial Communication");
 	builder.setTitle(title);
-	builder.setIcon(R.drawable.ictp_logo);
 	
 	builder.setMessage(
 		"The RFExplorer seems not connected.\n" +
@@ -1426,9 +1095,10 @@ void dialogSerialStartConnect(String title)
 		new DialogInterface.OnClickListener() {
 			public void onClick(DialogInterface dialog, int which) 
 			{
-				mSerialDevice = UsbSerialProber.acquire(mUsbManager);
-				Log.d(TAG, "mSerialDevice=" + mSerialDevice);
-				if (isSerialAcquired() == false)
+				// mSerialDevice = UsbSerialProber.acquire(mUsbManager);
+				RFEcom.UsbGetLink();
+				Log.d(TAG, "mSerialDevice=" + RFEcom.mSerialDevice);
+				if (RFEcom.isSerialAcquired() == false)
 				{
 					// serial was not acquired
 					// mTitleTextView.setText("No serial device acquired.");
@@ -1456,13 +1126,13 @@ void dialogSerialStartConnect(String title)
 				/***
 				//---------------------------------------------------------------
 				// visualizza il nome della porta seriale aperta
-				mTitleTextView.setText("Serial device: " + mSerialDevice);
+				mTitleTextView.setText("Serial device: " + RFEcom.mSerialDevice);
 				
 				// serial acquired
-				if(OpenSerial() == false)
+				if(RFEcom.OpenSerial() == false)
 				{
 					mTitleTextView.setText("Error opening serial port.");
-					CloseSerial();
+					RFEcom.CloseSerial();
 					return;
 				}
 				// abilita il manager di ricezione
@@ -1540,14 +1210,14 @@ void dialogSerialStartCommunicate(String title)
 				}
 				
 				// ========================== SET COMMUNICATION PARAMETERS
-				if(SetBaudSerial(baudRate) == false)
+				if(RFEcom.SetBaudSerial(baudRate) == false)
 				{
-					mTitleTextView.setText("Error setting baudrate port " + mSerialDevice);
-					CloseSerial();
+					mTitleTextView.setText("Error setting baudrate port " + RFEcom.mSerialDevice);
+					RFEcom.CloseSerial();
 					return;
 				}				
 				// invia il messaggio di configurazione
-				SendCfgMessage(1000);
+				RFEcom.SendCfgMessage(RxMsg, RfCfg, 1000);
 				editTextMainScreen.setText(RfCfg.strInfoParam());		// show the message
 				
 				// cancella la textview del data logging
@@ -1637,7 +1307,7 @@ void dialogSerialStartCommunicate(String title)
 						dialog.dismiss();
 						//-------------------------------------
 						// modifica 07/08/2015
-						// CloseSerial();
+						// RFEcom.CloseSerial();
 						setDisableReceive(true);			// disabilita la ricezione fino a quando non scegli un'opzione di menu
 						//-------------------------------------
 						CloseCsvFile();
@@ -1744,160 +1414,71 @@ void dialogSerialStartCommunicate(String title)
 	
 	public void showMainCmdMenu() 
 	{
+		final CharSequence[] items = { 
+			"Start New Campaign", 
+			"Open Campaign",
+			"Send Campaign to Email",
+			/***
+			// 14/09: disabled. Problem RFExplorer
+			"RFExplorer Frequency Limits",
+			***/
+			"Check GPS", 
+			"Android Hardware Info", 
+			"Program Info" 
+			};
+
 		// AlertDialog.Builder builder3 = new AlertDialog.Builder(AppActivity.this);
 		AlertDialog.Builder builder3 = new AlertDialog.Builder(global_context);
-		builder3.setTitle("RFTrack");
-		builder3.setIcon(R.drawable.ictp_logo);
-		if (isSerialAcquired())
-		{
-			final CharSequence[] items = { 
-				"Start New Campaign", 
-				"Open Campaign",
-				"Send Campaign to Email",
-				/***
-				// 14/09: disabled. Problem RFExplorer
-				"RFExplorer Frequency Limits",
-				***/
-				"Check GPS", 
-				"Android Hardware Info", 
-				"Program Info" 
-				};
-			builder3.setItems(items,
-			// builder3.setSingleChoiceItems(items,
-			new DialogInterface.OnClickListener() {
-				@Override
-				public void onClick(DialogInterface dialog,
-				int which) {
-					// TODO Auto-generated method stub
-
-					Toast.makeText(getApplicationContext(),
-					"You clicked " + items[which],
-					Toast.LENGTH_LONG).show();
-					
-					switch(which){
-					case 0:
-							showNewCampaign();
-						break;
-					case 1:
-							showOpenCampaign();
-						break;
-					case 2:
-							// 14/04/2016 sostituito: showSelectTypeEmail();
-							ForcePublicEmail();
-						break;
-
-					/*==========
-					// 14/09: disabled. Problem on RFExplorer
-					case 3:
-						showSelectRfExplorer();
-						break;
-					==========*/
-					case 3:
-							showGpsCheck();
-						break;
-					case 4:
-							showHardwareCheck();
-						break;
-					case 5:
-							showProgramInfo();
-						break;
-					}
-				}
-
-			});
-
-		}
-		else
-		{
-//			final CharSequence[] items = { 
-		    final CharSequence[] items = { 
-				// "Start New Campaign", 
-				// "Open Campaign",
-				"Send Campaign to Email",
-				/***
-				// 14/09: disabled. Problem RFExplorer
-				"RFExplorer Frequency Limits",
-				***/
-				"Check GPS", 
-				"Android Hardware Info", 
-				"Program Info" 
-				};
-
-			builder3.setItems(items,
-			// builder3.setSingleChoiceItems(items,
-			new DialogInterface.OnClickListener() {
-				@Override
-				public void onClick(DialogInterface dialog,
-				int which) {
-					// TODO Auto-generated method stub
-
-					Toast.makeText(getApplicationContext(),
-					"You clicked " + items[which],
-					Toast.LENGTH_LONG).show();
-					
-					switch(which){
-					case 0:
-							// 14/04/2016: sostituito: showSelectTypeEmail();
-							ForcePublicEmail();
-						break;
-					case 1:
-							showGpsCheck();
-						break;
-					case 2:
-							showHardwareCheck();
-						break;
-
-					/*==========
-					// 14/09: disabled. Problem on RFExplorer
-					case 3:
-						showSelectRfExplorer();
-						break;
-					==========*/
-					case 3:
-							showProgramInfo();
-						break;
-					}
-				}
-
-			});
-		}
-		// original: builder3.show();
-
-		// mr modify 05/04
-		AlertDialog alert = builder3.create();
-		alert.show();
 		
-		/****
-		// mr 05/04: disable new campaign open campaign if serial is not acquired.
-		// http://stackoverflow.com/questions/33027918/android-alertdialog-how-to-disable-certain-choices-that-are-not-available
-		list = alert.getListView();
-		if (isSerialAcquired()==false)
-		{
-			list.getChildAt(0).setEnabled(false);
-			list.getChildAt(1).setEnabled(false);
-		}
-		else
-		{
-			list.getChildAt(0).setEnabled(true);
-			list.getChildAt(1).setEnabled(true);
-		}
-		list.getChildAt(2).setEnabled(true);
-		list.getChildAt(3).setEnabled(true);
-		list.getChildAt(4).setEnabled(true);
-		list.getChildAt(5).setEnabled(true);
-		// final ListAdapter adaptor = alert.getListView().getAdapter();
-		// adaptor.getView(0, null, list).setEnabled(true);
-		// adaptor.getView(1, null, list).setEnabled(true);
-		// adaptor.getView(2, null, list).setEnabled(true);
-		// adaptor.getView(3, null, list).setEnabled(true);
-		// adaptor.getView(4, null, list).setEnabled(true);
-		// adaptor.getView(5, null, list).setEnabled(true);
-		// if (isSerialAcquired()==false)
-		// {
-			// adaptor.getView(0, null, list).setEnabled(false);
-			// adaptor.getView(1, null, list).setEnabled(false);
-		// }
-		***/
+		builder3.setTitle("RFTrack").setItems(items,
+		new DialogInterface.OnClickListener() {
+			@Override
+			public void onClick(DialogInterface dialog,
+			int which) {
+				// TODO Auto-generated method stub
+
+				Toast.makeText(getApplicationContext(),
+				"You clicked " + items[which],
+				Toast.LENGTH_LONG).show();
+				
+				switch(which){
+				case 0:
+					//---------------------------------
+					// ori
+					// richiamo altra attivita'
+					// Intent intent = new Intent(context, App2Activity.class);
+					// startActivity(intent);   
+					//---------------------------------
+					showNewCampaign();
+					break;
+				case 1:
+					showOpenCampaign();
+					break;
+				case 2:
+					// showSelectCampaignForEmail();
+					showSelectTypeEmail();
+					break;
+
+				/*==========
+				// 14/09: disabled. Problem on RFExplorer
+				case 3:
+					showSelectRfExplorer();
+					break;
+				==========*/
+				case 3:
+					showGpsCheck();
+					break;
+				case 4:
+					showHardwareCheck();
+					break;
+				case 5:
+					showProgramInfo();
+					break;
+				}
+			}
+
+		});
+		builder3.show();
 	}
 	
 //----------------------------------------------
@@ -1962,15 +1543,6 @@ void showFreqModBase(String title)
 				.show();
 				
 				RFEfreq.SetFreqLimits(RFEfreq.idxModel, 0);
-				
-				//-----------------------------------
-				// modifica 12/04:
-				// imposta i valori di frequenza per il grafico
-				float min = ((float)RFEfreq.GetStart()) / 1000.0f;
-				float max = ((float)RFEfreq.GetEnd()) / 1000.0f;
-				graphView.setHorLabels(min, max);
-				graphView.refreshGraph();
-				//-----------------------------------
 				
 				dialog.dismiss();
 				// mr: aggiunta:
@@ -2058,7 +1630,10 @@ void showFreqModCombo(String title)
 		// this-The current activity context.
 		// Second param is the resource Id for list layout row item
 		// Third param is input array 
-		ArrayAdapter arrayAdapter = new ArrayAdapter(this, android.R.layout.simple_list_item_single_choice, data);
+		@SuppressWarnings({
+                "unchecked", "rawtypes"
+        })
+        ArrayAdapter arrayAdapter = new ArrayAdapter(this, android.R.layout.simple_list_item_single_choice, data);
 		listView.setAdapter(arrayAdapter);
 		
         listView.setItemsCanFocus(true);
@@ -2453,18 +2028,6 @@ void showFreqModCombo(String title)
 
 	// @@@@
 	
-	void ForcePublicEmail()
-	{
-		nTypeEmail = 0;				// email di tipo public
-		// arrivi qui ed hai selezionato il tipo di email
-		//--------------------------------
-		showSelectCampaignForEmail();
-		//--------------------------------
-	}
-	
-	// 14/04/2016: disabilitato.
-	// Al suo posto si usa ForcePublicEmail()
-	//
 	// dialogo per scelta tipo invio da effettuare via email
 	void showSelectTypeEmail()
 	{
@@ -2909,17 +2472,9 @@ void showFreqModCombo(String title)
 		dialog.setTitle("Program Info");
 
 		dialog.setMessage( 
-			ProgramName + "\n" +
-			"Ver. " + ProgramVersion + "\n" +
-			"\n" +
-			"Authors:\n" +
-			"   Marco Zennaro - ICTP\n" +
-			"   Ermanno Pietrosemoli - ICTP\n" +
-			"   Marco Rainone\n" +
-			"Programmer: Marco Rainone\n" +
-			"\n" +
-			"Web address of the reports analyzed:\n" +
-			"http://wireless.ictp.it/tvws/\n"
+				ProgramName + "\n" +
+				"Ver. " + ProgramVersion + "\n\n" +
+				"Author: Marco Rainone -\n"
 		);
 		dialog.setCancelable(false);
 		dialog.setButton(DialogInterface.BUTTON_NEGATIVE, "Exit", new DialogInterface.OnClickListener() {
@@ -2936,53 +2491,9 @@ void showFreqModCombo(String title)
 	
     //-----------------------------------------------------------
 	// @@@ QUI INSERITO PER TEST TABELLA
-	private ScrollView layMain;
-	private TableGenerator mTable;
+	   private ScrollView layMain;
+	    private TableGenerator mTable;
 
-    //-----------------------------------------------------------
-	// @@@ QUI INSERITO PER TEST GRAFICO
-	private ScrollView layGraph;
-	private GraphView graphView;
-	double incAlfa = 0.0;
-	float[] GrpValues = new float[112];
-		
-	void DataSet(double inc)
-	{
-		for(int i=0;i<112;i++)
-		{
-			GrpValues[i] = (float) (11.0 + 
-				15.0 * (Math.cos(inc + Math.PI * (float)i /(float) 180.0)));
-		}
-	}
-	// @@@ fine dati grafico
-    //-----------------------------------------------------------
-
-	int widthScreen;
-	int heightScreen;
-	
-	// http://stackoverflow.com/questions/11252067/how-do-i-get-the-screensize-programmatically-in-android
-	// ok, funziona
-	private void getScreenResolution(Context context)
-	{
-		WindowManager wm = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
-		Display display = wm.getDefaultDisplay();
-		DisplayMetrics metrics = new DisplayMetrics();
-		display.getMetrics(metrics);
-		widthScreen = metrics.widthPixels;
-		heightScreen = metrics.heightPixels;
-
-		// return "{" + width + "," + height + "}";
-	}	
-	
-	// http://stackoverflow.com/questions/4743116/get-screen-width-and-height
-	public static int getScreenWidth() {
-		return Resources.getSystem().getDisplayMetrics().widthPixels;
-	}
-
-	public static int getScreenHeight() {
-		return Resources.getSystem().getDisplayMetrics().heightPixels;
-	}
-	
     // The entire lifetime of an activity happens between the first call to onCreate(Bundle) through to a single final call to onDestroy().
     // An activity will do all setup of "global" state in onCreate(), and release all remaining resources in onDestroy().
     @Override
@@ -3011,15 +2522,11 @@ void showFreqModCombo(String title)
 		// keep the screen on 
 		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 		
-		//------------------------
 		// disable rotation
 		// setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
 		// setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 		// This is the default value for rotation
-		// original
 		setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
-		//------------------------
-		
 		// disable rotation
 		setAutoOrientationEnabled(getContentResolver(), false);
 		
@@ -3052,90 +2559,18 @@ void showFreqModCombo(String title)
 		
 		// Get mUsbManager from Android.
     	// mUsbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
-		getUsbManager();
-		// ------------------------------
-		// mr modify 06/04
-		// inserted to enable/disable menu options in base of acquisition of serial port.
-		// If the serial port is not acquired, disable New Campaign, Open Campaign
-        if (mSerialDevice == null)
-        {
-			// get link of the first compatible usb serial device in bus usb
-			mSerialDevice = UsbSerialProber.acquire(mUsbManager);
-			Log.d(TAG, "mSerialDevice=" + mSerialDevice);
-		}
-		// ------------------------------
+		RFEcom.getUsbManager(this);
 
 		//------------------------------------
 		// PER TABELLA
-		mTable = new TableGenerator(getApplicationContext());
-		layMain = (ScrollView)findViewById(R.id.table);
-		// layMain = (ScrollView)findViewById(R.id.rfexploScroller);
-		
-		String[] mrRow = {
-			"N.Readings:", 
-			"GPS Pos. Fixed:", 
-			"Latitude:", 
-			"Longitude:", 
-			"Altitude", 
-			"% samples < -100dBm:"
-			// "Freq (MHz):", 
-			// "Time:"
-			};
-		
-		// original mTable.addRow(mrRow);
-		// mr 06/04
-		mTable.addNRows(mrRow);
-		
-		layMain.addView(mTable.getTable());
-
-		// ---------------------------------------
-		// http://www.sherif.mobi/2013/01/how-to-get-widthheight-of-view.html
-		// modifica funzionante!!!
-		layMain.measure(MeasureSpec.UNSPECIFIED, MeasureSpec.UNSPECIFIED);
-		// int main_widht = layMain.getMeasuredWidth();
-		// int main_height = layMain.getMeasuredHeight();
-		// ---------------------------------------
-		
-		//------------------------------------
-		// PER IL GRAFICO
-		// getScreenResolution(global_context);
-		widthScreen = getScreenWidth();
-		heightScreen = getScreenHeight();
-		
-		
-		layGraph = (ScrollView)findViewById(R.id.graphic);
-		
-		/**
-		//-------------
-		// http://stackoverflow.com/questions/2963152/android-how-to-resize-a-custom-view-programmatically
-		float pixels = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 150, getResources().getDisplayMetrics());
-		LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) layGraph.getLayoutParams();
-		params.height = (int)200;
-		layGraph.setLayoutParams(params);
-		//-------------
-		**/
-		
-		String[] verlabels = new String[] { "-50", "-60", "-70", "-80", "-90", "-100" };
-		String[] horlabels = new String[] { "300", "400", "500", "600", "700", "800", "900" };
-		// originale demo: DataSet(0.0);
-		graphView = new GraphView(
-					this,
-					(float)widthScreen,
-					// original 14/04: (float)(widthScreen) * (float)0.38,			// height of drawing area
-					// modify 14/04: aumentata dimensione
-					(float)(widthScreen) * (float)0.49,			// height of drawing area
-					// (float)(heightScreen - main_height - main_height/2 - main_height/5),			// height of drawing area
-					// originale demo GrpValues, 
-					// RxMsg.getGraphDbm(),		// dati del messaggio ricevuto
-					null,					// vettore dati da visualizzare
-					"dBm values",			// titolo
-					horlabels, 				// horizontal labels
-					verlabels, // null,		// vertical labels, 
-					GraphView.BAR
-					// GraphView.LINE
-					);
-		layGraph.addView(graphView);
-		
+	      mTable = new TableGenerator(getApplicationContext());
+	      layMain = (ScrollView)findViewById(R.id.table);
+	      // layMain = (ScrollView)findViewById(R.id.rfexploScroller);
+		  
+	      String[] mrRow = {"Time:", "Latitude:", "Longitude:", "Altitude", "Freq (MHz):", "Max dBm:"};
+	      mTable.addRow(mrRow);
+	      layMain.addView(mTable.getTable());
+	        
 		//-------------------------------------
 		// 18/11/2014: init tone generator. 
 		// A tone is generated for each group of measurements acquired by the instrument
@@ -3216,20 +2651,11 @@ void showFreqModCombo(String title)
 						//-------------------------------------
 						
 						// ========================== SET COMMUNICATION PARAMETERS
-						if(SetBaudSerial(baudRate))
+						if(RFEcom.SetBaudSerial(baudRate))
 						{
 							// invia il messaggio di configurazione
-							SendCfgMessage(1000);
+							RFEcom.SendCfgMessage(RxMsg, RfCfg, 1000);
 
-							//-----------------------------------
-							// modifica 12/04:
-							// imposta i valori di frequenza per il grafico
-							float min = ((float)RFEfreq.GetStart()) / 1000.0f;
-							float max = ((float)RFEfreq.GetEnd()) / 1000.0f;
-							graphView.setHorLabels(min, max);
-							graphView.refreshGraph();
-							//-----------------------------------
-							
 							editTextMainScreen.setText(RfCfg.strInfoParam());		// show the message
 
 							// cancella la textview del data logging
@@ -3347,7 +2773,7 @@ void showFreqModCombo(String title)
 		//------------------------------------------
 		// per la seriale
         stopRxSerialManager();
-		CloseSerial();
+		RFEcom.CloseSerial();
 		
 		fReturnOnPause = true;			// true se OnPause e' avvenuto
     }				// end onPause
@@ -3368,9 +2794,10 @@ void showFreqModCombo(String title)
 		// serial init:
 		//
 		// get link of the first compatible usb serial device in bus usb
-		mSerialDevice = UsbSerialProber.acquire(mUsbManager);
-        Log.d(TAG, "Resumed, mSerialDevice=" + mSerialDevice);
-		if (isSerialAcquired() == false)
+		// mSerialDevice = UsbSerialProber.acquire(mUsbManager);
+		RFEcom.UsbGetLink();
+        Log.d(TAG, "Resumed, mSerialDevice=" + RFEcom.mSerialDevice);
+		if (RFEcom.isSerialAcquired() == false)
         {
 			// serial was not acquired
 			/***
@@ -3378,21 +2805,15 @@ void showFreqModCombo(String title)
             mTitleTextView.setText("No serial device acquired.");
 			return;
 			***/
-			
-			// show that the app functions are reduced
-			dialogInfoRFENotCommected("RFExplorer is not connected");
-			/****
-			// original app 0.58
 			for(int i=1;i<=3;i++)
 			{
 				dialogSerialStartConnect("Tentative n." + String.valueOf(i));
 				// dialogSerialStartConnect("Connection error");
-				if (isSerialAcquired())
+				if (RFEcom.isSerialAcquired())
 					break;
 			}
-			****/
         };
-		if (isSerialAcquired() == false)
+		if (RFEcom.isSerialAcquired() == false)
         {
 			// serial was not acquired
             mTitleTextView.setText("No serial device acquired.");
@@ -3401,7 +2822,7 @@ void showFreqModCombo(String title)
 		//---------------------------------------------------------------
 		// visualizza il nome della porta seriale aperta
 		String name_serial = "";
-
+		/***
 		if(mSerialDevice != null)
 		{
 			name_serial = mSerialDevice.toString();
@@ -3411,14 +2832,16 @@ void showFreqModCombo(String title)
 				name_serial = name_serial.substring(pos+1, name_serial.length());
 			}
 		}
-		// ori mTitleTextView.setText("Serial device: " + mSerialDevice);
+		***/
+		name_serial = RFEcom.NameSerial();
+		// ori mTitleTextView.setText("Serial device: " + RFEcom.mSerialDevice);
 		mTitleTextView.setText("Serial device: " + name_serial);
 		
 		// serial acquired
-		if(OpenSerial() == false)
+		if(RFEcom.OpenSerial() == false)
 		{
 			mTitleTextView.setText("Error opening serial port.");
-			CloseSerial();
+			RFEcom.CloseSerial();
 			return;
 		}
 		/**
@@ -3435,14 +2858,14 @@ void showFreqModCombo(String title)
 			//
 			// serial opened
 			// ========================== SET COMMUNICATION PARAMETERS
-			if(SetBaudSerial(baudRate) == false)
+			if(RFEcom.SetBaudSerial(baudRate) == false)
 			{
-				mTitleTextView.setText("Error setting baudrate port " + mSerialDevice);
-				CloseSerial();
+				mTitleTextView.setText("Error setting baudrate port " + RFEcom.mSerialDevice);
+				RFEcom.CloseSerial();
 				return;
 			}				
 			// invia il messaggio di configurazione
-			SendCfgMessage(500);
+			RFEcom.SendCfgMessage(RxMsg, RfCfg, 500);
 			
 			fReturnOnPause = false;
 		}
@@ -3495,7 +2918,7 @@ void showFreqModCombo(String title)
 		{
 			Log.e(TAG, "Error setting up device: " + e.getMessage(), e);
 			mTitleTextView.setText("Error opening device: " + e.getMessage());
-			CloseSerial();
+			RFEcom.CloseSerial();
 			return;
 		}
 		*******/
@@ -3503,11 +2926,11 @@ void showFreqModCombo(String title)
 		
 		// POSIZIONE ORIGINALE:
         stopRxSerialManager();
-        startRxSerialManager();
+        RFEcom.startRxSerialManager(this);
 		
 		//---------------------------------------------------------------
 		// visualizza il nome della porta seriale aperta
-		// mTitleTextView.setText("Serial device: " + mSerialDevice);
+		// mTitleTextView.setText("Serial device: " + RFEcom.mSerialDevice);
 
 		//
 		// serial init:
